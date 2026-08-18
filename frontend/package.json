@@ -1,0 +1,16 @@
+{
+  "name": "genlayer-ai-content-verifier-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "genlayer-js": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {}
+}
