@@ -1,19 +1,45 @@
 # GenLayer AI Content Verifier
 
-A small decentralized application built around a GenLayer Intelligent Contract. Users submit text from a browser UI, the frontend sends a transaction to GenLayer, and the contract uses an LLM call inside GenLayer's Equivalence Principle to reach validator consensus on a content review.
+A decentralized content moderation application built around a GenLayer Intelligent Contract. Each browser submission becomes its own on-chain moderation request. Validators use GenLayer consensus to review the content, consider relevant factual evidence, and return a structured PASS, REVIEW, or REJECT verdict. A separate moderation control then applies APPROVE, HOLD, or REJECT to that specific request.
 
 ## Why GenLayer is central
 
-The core decision is not performed only in the browser. `contracts/content_verifier.py` runs `gl.nondet.exec_prompt()` inside `gl.eq_principle.prompt_comparative()`. Validators independently execute the same review task and compare the resulting verdict according to an explicit principle. The accepted result is then written to contract state.
+The core review is not performed only in the browser. `contracts/content_verifier.py` runs `gl.nondet.exec_prompt()` inside `gl.eq_principle.prompt_comparative()`. Validators independently execute the review task and compare the verdict and factual assessment according to an explicit principle. The accepted result is persisted under a unique request ID.
+
+## Request and moderation workflow
+
+```text
+Browser UI
+   |
+   | verify_content(text)
+   v
+Create unique request ID
+   |
+   | gl.nondet.exec_prompt()
+   v
+GenLayer Equivalence Principle
+   |
+   | validator consensus + relevant source verification
+   v
+PASS / REVIEW / REJECT stored for that request
+   |
+   | get_request(request_id)
+   v
+Moderator reviews evidence and applies:
+APPROVE / HOLD / REJECT
+   |
+   v
+Moderation action persisted on the same request
+```
 
 ## Project structure
 
 ```text
 contracts/
-  content_verifier.py       # GenLayer Intelligent Contract
+  content_verifier.py       # Per-request GenLayer Intelligent Contract
 frontend/
   index.html                 # Browser entry point
-  src/main.js                # GenLayerJS read/write integration
+  src/main.js                # GenLayerJS read/write and moderation controls
   src/style.css              # UI
   .env.example               # Contract address configuration
 tests/
@@ -30,7 +56,7 @@ pip install -r requirements.txt
 pytest tests/direct/ -v
 ```
 
-The direct tests cover initial contract state and deterministic input validation. The LLM call is intentionally exercised through GenLayer's consensus execution rather than mocked into the application logic.
+The direct tests cover input validation, end-to-end request persistence, allowed validator verdicts, per-request isolation, and the moderation action workflow.
 
 ## Run the frontend
 
@@ -48,34 +74,17 @@ Set `VITE_CONTRACT_ADDRESS` to the address of a deployed `ContentVerifier` contr
 1. connect to the user's browser wallet,
 2. switch the wallet to GenLayer Testnet Bradbury,
 3. call `verify_content(text)` as a write transaction,
-4. wait for the accepted transaction receipt, and
-5. read `get_last_review()` from the deployed contract.
+4. wait for the accepted validator-consensus receipt,
+5. read a specific request with `get_request(request_id)`, and
+6. apply `APPROVE`, `HOLD`, or `REJECT` to that specific request with `set_moderation()`.
 
-## Contract workflow
+## Evidence-aware review
 
-```text
-Browser UI
-   |
-   | GenLayerJS writeContract()
-   v
-ContentVerifier.verify_content()
-   |
-   | gl.nondet.exec_prompt()
-   v
-GenLayer Equivalence Principle
-   |
-   | validator consensus
-   v
-Accepted review stored on-chain
-   |
-   | GenLayerJS readContract()
-   v
-Browser UI
-```
+When factual claims are present, validators are instructed to identify relevant primary or authoritative sources and return them in the structured review. The contract stores the source evidence together with the verdict and reason so the review is not just a globally overwriteable AI opinion.
 
 ## Security / scope
 
-This is an educational community project. It does not claim to provide legal, financial, medical, or professional content moderation. The contract stores only the latest submitted text and review result for this simple demonstration.
+This is an educational community project. It does not claim to provide legal, financial, medical, or professional content moderation. Moderation actions are intentionally explicit and request-scoped so a new submission cannot overwrite the result or workflow state of an earlier submission.
 
 ## References
 
